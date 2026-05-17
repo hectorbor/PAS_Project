@@ -34,6 +34,25 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    androidResources {
+        generateLocaleConfig = false
+    }
+
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
+    //packaging {
+      //  resources {
+        //    excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        //}
+    //}
 }
 
 dependencies {
@@ -68,4 +87,7 @@ dependencies {
 
     // Google Maps
     implementation("com.google.android.gms:play-services-maps:19.0.0")
+
+    // ONNX Runtime
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.16.3")
 }

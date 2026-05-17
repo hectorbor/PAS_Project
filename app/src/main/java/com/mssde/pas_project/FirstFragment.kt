@@ -18,6 +18,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.mssde.pas_project.databinding.FragmentFirstBinding
+import com.mssde.pas_project.ml.RiegoPredictor
 import com.mssde.pas_project.model.DispositivoRiego
 import com.mssde.pas_project.repository.WeatherRepository
 import com.mssde.pas_project.viewmodel.WeatherViewModel
@@ -31,6 +32,8 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
     private val binding get() = _binding!!
     private val viewModel: WeatherViewModel by viewModels()
     private var googleMap: GoogleMap? = null
+
+    private lateinit var riegoPredictor: RiegoPredictor
     private val repository = WeatherRepository()
 
     private val dispositivos = listOf(
@@ -55,6 +58,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+        riegoPredictor = RiegoPredictor(requireContext())
     }
 
     override fun onMapReady(map: GoogleMap) {
@@ -130,6 +134,68 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             }
         }
 
+        // ← AQUÍ va el código del botón riego
+        val btnRiego = view.findViewById<Button>(R.id.btnRiego)
+        val tvRiego = view.findViewById<TextView>(R.id.tvMeteo)
+        btnRiego.isEnabled = true
+
+        btnRiego.setOnClickListener {
+            lifecycleScope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    repository.getWeatherByCoords(
+                        dispositivo.ubicacion.latitude,
+                        dispositivo.ubicacion.longitude
+                    )
+                }
+                result.fold(
+                    onSuccess = { data ->
+                        val tempMax = data.daily?.temperature_2m_max?.getOrNull(0)?.toFloat() ?: 25f
+                        val tempMin = data.daily?.temperature_2m_min?.getOrNull(0)?.toFloat() ?: 12f
+                        val lluvia = data.daily?.precipitation_probability_max?.getOrNull(0)?.toFloat() ?: 50f
+
+                        // Calcular ETo (Hargreaves simplificado)
+                        val tempMedia = (tempMax + tempMin) / 2f
+                        val eto = 0.0023f * (tempMedia + 17.8f) * Math.sqrt(Math.abs((tempMax - tempMin).toDouble())).toFloat() * 10f
+
+                        // Estación según mes actual
+                        val mes = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH)
+                        val estacion = when (mes) {
+                            11, 0, 1 -> 0f   // invierno
+                            2, 3, 4 -> 1f    // primavera
+                            5, 6, 7 -> 2f    // verano
+                            else -> 3f       // otoño
+                        }
+
+                        val (debeRegar, probabilidad) = riegoPredictor.predecir(
+                            humedadSuelo = dispositivo.humedad.toFloat(),
+                            tempSuelo = dispositivo.temperatura.toFloat(),
+                            ph = dispositivo.ph.toFloat(),
+                            tempMax = tempMax,
+                            tempMin = tempMin,
+                            probLluvia = lluvia,
+                            lluvia24h = 0f,       // sin datos reales por ahora
+                            humedadAire = 60f,    // sin datos reales por ahora
+                            viento = 10f,         // sin datos reales por ahora
+                            diasSinRiego = 2f,    // sin datos reales por ahora
+                            estacion = estacion,
+                            eto = eto
+                        )
+
+                        val porcentaje = (probabilidad * 100).toInt()
+                        val mensaje = if (debeRegar)
+                            "✅ SE RECOMIENDA REGAR\nConfianza: $porcentaje%"
+                        else
+                            "❌ NO SE RECOMIENDA REGAR\nConfianza: ${100 - porcentaje}%"
+
+                        tvRiego.text = mensaje
+                    },
+                    onFailure = {
+                        tvRiego.text = "Error al obtener datos meteorológicos"
+                    }
+                )
+            }
+        }
+
         dialog.show()
     }
 
@@ -182,6 +248,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        riegoPredictor.close()
         _binding = null
     }
 }

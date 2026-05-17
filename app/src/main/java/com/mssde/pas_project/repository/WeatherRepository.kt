@@ -58,4 +58,28 @@ class WeatherRepository {
             Result.failure(e)
         }
     }
+    suspend fun getWeatherByCoords(lat: Double, lon: Double): Result<OpenMeteoResponse> {
+        return try {
+            val url = "https://api.open-meteo.com/v1/forecast" +
+                    "?latitude=$lat" +
+                    "&longitude=$lon" +
+                    "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode" +
+                    "&timezone=Europe/Madrid" +
+                    "&forecast_days=7"
+
+            val client = getHttpClient()
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            val body = response.body?.string()
+
+            if (response.isSuccessful && body != null) {
+                val data = Gson().fromJson(body, OpenMeteoResponse::class.java)
+                Result.success(data)
+            } else {
+                Result.failure(Exception("Error: ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

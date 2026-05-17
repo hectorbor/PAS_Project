@@ -27,10 +27,12 @@ object RetrofitClient {
         return OkHttpClient.Builder()
             .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
             .hostnameVerifier { _, _ -> true }
+            .connectionPool(okhttp3.ConnectionPool(0, 1, java.util.concurrent.TimeUnit.NANOSECONDS)) // <- no reutiliza conexiones
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .addHeader("Accept-Encoding", "identity") // <- desactiva gzip
+                    .addHeader("Accept-Encoding", "identity")
                     .addHeader("Accept", "application/json")
+                    .addHeader("Connection", "close") // <- cierra tras cada petición
                     .build()
                 chain.proceed(request)
             }

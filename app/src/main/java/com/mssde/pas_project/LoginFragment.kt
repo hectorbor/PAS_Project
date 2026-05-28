@@ -35,18 +35,32 @@ class LoginFragment : Fragment(R.layout.fragment_login) {
             }
         }
 
+        binding.btnLogin.setOnClickListener {
+            val email = binding.etEmail.text.toString().trim()
+            val pass = binding.etPassword.text.toString().trim()
+
+            Log.i("LOGIN_TEST", "Click en ENTRAR detectado para: $email")
+
+            if (validateInput(email, pass)) {
+                Toast.makeText(context, "Iniciando sesión...", Toast.LENGTH_SHORT).show()
+                Log.i("LOGIN_TEST", "Validación correcta, llamando a viewModel.login")
+                viewModel.login(email, pass)
+            } else {
+                Toast.makeText(context, "Por favor, completa los campos correctamente", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         binding.btnRegister.setOnClickListener {
             val email = binding.etEmail.text.toString().trim()
             val pass = binding.etPassword.text.toString().trim()
             
-            // Log forzado para ver en Logcat sin filtros
-            println("!!! BOTON PULSADO: Intentando registrar $email")
-            Toast.makeText(context, "Click detectado", Toast.LENGTH_SHORT).show()
+            Log.i("LOGIN_TEST", "Click en REGISTRAR detectado para: $email")
             
             if (validateInput(email, pass)) {
                 if (pass.length < 6) {
                     binding.tilPassword.error = "Mínimo 6 caracteres"
                 } else {
+                    Toast.makeText(context, "Creando cuenta...", Toast.LENGTH_SHORT).show()
                     Log.i("LOGIN_TEST", "Llamando a viewModel.register")
                     viewModel.register(email, pass)
                 }

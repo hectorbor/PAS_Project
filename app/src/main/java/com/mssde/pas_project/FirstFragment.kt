@@ -1,6 +1,7 @@
 package com.mssde.pas_project
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +22,7 @@ import com.mssde.pas_project.databinding.FragmentFirstBinding
 import com.mssde.pas_project.ml.RiegoPredictor
 import com.mssde.pas_project.model.DispositivoRiego
 import com.mssde.pas_project.repository.WeatherRepository
+import com.mssde.pas_project.viewmodel.RiegoViewModel
 import com.mssde.pas_project.viewmodel.WeatherViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -36,12 +38,10 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
     private lateinit var riegoPredictor: RiegoPredictor
     private val repository = WeatherRepository()
 
-    private val dispositivos = listOf(
-        DispositivoRiego("Dispositivo Riego 1", LatLng(40.4168, -3.7038), 65.0, 22.5, 6.8, true),
-        DispositivoRiego("Dispositivo Riego 2", LatLng(40.4200, -3.7100), 45.0, 21.0, 7.1, false),
-        DispositivoRiego("Dispositivo Riego 3", LatLng(40.4150, -3.6980), 78.0, 23.0, 6.5, true),
-        DispositivoRiego("Dispositivo Riego 4", LatLng(40.4220, -3.6950), 55.0, 20.5, 7.0, false)
-    )
+    private val riegoViewModel: RiegoViewModel by viewModels()
+
+    // Lista que se sincronizará con Firebase
+    private var dispositivosFirebase: List<DispositivoRiego> = emptyList()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -58,34 +58,65 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+        // Observamos los cambios en tiempo real desde Firebase
+        riegoViewModel.listaRiegos.observe(viewLifecycleOwner) { lista ->
+            Log.d("Firebase", "Datos recibidos: ${lista.size} dispositivos")
+            dispositivosFirebase = lista
+            actualizarMapa()
+            
+            // Si la base de datos está vacía, creamos los puntos iniciales
+            inicializarDatosSiEsNecesario(lista)
+        }
+
         riegoPredictor = RiegoPredictor(requireContext())
+    }
+
+    private fun inicializarDatosSiEsNecesario(lista: List<DispositivoRiego>) {
+        if (lista.isEmpty()) {
+            Log.d("Firebase", "Base de datos vacía, creando puntos iniciales...")
+            val puntosIniciales = listOf(
+                DispositivoRiego("Sector Norte", 40.4168, -3.7038, 45.0, 22.0, 6.5, false),
+                DispositivoRiego("Sector Sur", 40.4180, -3.7050, 30.0, 24.0, 6.8, false),
+                DispositivoRiego("Invernadero A", 40.4150, -3.7020, 60.0, 20.0, 6.2, true),
+                DispositivoRiego("Zona Huerto", 40.4160, -3.7070, 15.0, 26.0, 7.0, false)
+            )
+            puntosIniciales.forEach { riegoViewModel.actualizarEnFirebase(it) }
+        }
     }
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
 
-        dispositivos.forEach { dispositivo ->
-            val color = if (dispositivo.activo)
-                BitmapDescriptorFactory.HUE_GREEN
-            else
-                BitmapDescriptorFactory.HUE_RED
-
-            googleMap?.addMarker(
-                MarkerOptions()
-                    .position(dispositivo.ubicacion)
-                    .title(dispositivo.nombre)
-                    .icon(BitmapDescriptorFactory.defaultMarker(color))
-            )
-        }
-
         googleMap?.setOnMarkerClickListener { marker ->
-            val dispositivo = dispositivos.find { it.nombre == marker.title }
+            // Buscamos el dispositivo por el título del marcador
+            val dispositivo = dispositivosFirebase.find { it.nombre == marker.title }
             dispositivo?.let { mostrarBottomSheet(it) }
             true
         }
 
         val centro = LatLng(40.4168, -3.7038)
         googleMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(centro, 13f))
+        
+        actualizarMapa()
+    }
+
+    private fun actualizarMapa() {
+        val map = googleMap ?: return
+        map.clear()
+        
+        dispositivosFirebase.forEach { dispositivo ->
+            val color = if (dispositivo.activo)
+                BitmapDescriptorFactory.HUE_GREEN
+            else
+                BitmapDescriptorFactory.HUE_RED
+
+            map.addMarker(
+                MarkerOptions()
+                    .position(LatLng(dispositivo.latitud, dispositivo.longitud))
+                    .title(dispositivo.nombre)
+                    .icon(BitmapDescriptorFactory.defaultMarker(color))
+            )
+        }
     }
 
     private fun mostrarBottomSheet(dispositivo: DispositivoRiego) {
@@ -102,12 +133,15 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         val btnActivar = view.findViewById<Button>(R.id.btnActivar)
         val tvMeteo = view.findViewById<TextView>(R.id.tvMeteo)
 
-        actualizarEstado(tvEstado, btnActivar, dispositivo)
+        actualizarEstadoUI(tvEstado, btnActivar, dispositivo)
 
         btnActivar.setOnClickListener {
+            // Cambiamos el estado y lo mandamos a Firebase
             dispositivo.activo = !dispositivo.activo
-            actualizarEstado(tvEstado, btnActivar, dispositivo)
-            actualizarColorMarcador(dispositivo)
+            riegoViewModel.actualizarEnFirebase(dispositivo)
+            
+            // Actualizamos la UI local del diálogo
+            actualizarEstadoUI(tvEstado, btnActivar, dispositivo)
         }
 
         view.findViewById<Button>(R.id.btnMeteo).setOnClickListener {
@@ -115,8 +149,8 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             lifecycleScope.launch {
                 val result = withContext(Dispatchers.IO) {
                     repository.getWeatherByCoords(
-                        dispositivo.ubicacion.latitude,
-                        dispositivo.ubicacion.longitude
+                        dispositivo.latitud,
+                        dispositivo.longitud
                     )
                 }
                 result.fold(
@@ -134,18 +168,11 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             }
         }
 
-        // ← AQUÍ va el código del botón riego
         val btnRiego = view.findViewById<Button>(R.id.btnRiego)
-        val tvRiego = view.findViewById<TextView>(R.id.tvMeteo)
-        btnRiego.isEnabled = true
-
         btnRiego.setOnClickListener {
             lifecycleScope.launch {
                 val result = withContext(Dispatchers.IO) {
-                    repository.getWeatherByCoords(
-                        dispositivo.ubicacion.latitude,
-                        dispositivo.ubicacion.longitude
-                    )
+                    repository.getWeatherByCoords(dispositivo.latitud, dispositivo.longitud)
                 }
                 result.fold(
                     onSuccess = { data ->
@@ -153,11 +180,9 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
                         val tempMin = data.daily?.temperature_2m_min?.getOrNull(0)?.toFloat() ?: 12f
                         val lluvia = data.daily?.precipitation_probability_max?.getOrNull(0)?.toFloat() ?: 50f
 
-                        // Calcular ETo (Hargreaves simplificado)
                         val tempMedia = (tempMax + tempMin) / 2f
                         val eto = 0.0023f * (tempMedia + 17.8f) * Math.sqrt(Math.abs((tempMax - tempMin).toDouble())).toFloat() * 10f
 
-                        // Estación según mes actual
                         val mes = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH)
                         val estacion = when (mes) {
                             11, 0, 1 -> 0f   // invierno
@@ -173,25 +198,21 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
                             tempMax = tempMax,
                             tempMin = tempMin,
                             probLluvia = lluvia,
-                            lluvia24h = 0f,       // sin datos reales por ahora
-                            humedadAire = 60f,    // sin datos reales por ahora
-                            viento = 10f,         // sin datos reales por ahora
-                            diasSinRiego = 2f,    // sin datos reales por ahora
+                            lluvia24h = 0f,
+                            humedadAire = 60f,
+                            viento = 10f,
+                            diasSinRiego = 2f,
                             estacion = estacion,
                             eto = eto
                         )
 
                         val porcentaje = (probabilidad * 100).toInt()
-                        val mensaje = if (debeRegar)
-                            "✅ SE RECOMIENDA REGAR\nConfianza: $porcentaje%"
-                        else
-                            "❌ NO SE RECOMIENDA REGAR\nConfianza: ${100 - porcentaje}%"
-
-                        tvRiego.text = mensaje
+                        tvMeteo.text = if (debeRegar) 
+                            "✅ SE RECOMIENDA REGAR ($porcentaje%)" 
+                        else 
+                            "❌ NO SE RECOMIENDA REGAR (${100-porcentaje}%)"
                     },
-                    onFailure = {
-                        tvRiego.text = "Error al obtener datos meteorológicos"
-                    }
+                    onFailure = { tvMeteo.text = "Error de predicción" }
                 )
             }
         }
@@ -199,7 +220,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         dialog.show()
     }
 
-    private fun actualizarEstado(tvEstado: TextView, btnActivar: Button, dispositivo: DispositivoRiego) {
+    private fun actualizarEstadoUI(tvEstado: TextView, btnActivar: Button, dispositivo: DispositivoRiego) {
         if (dispositivo.activo) {
             tvEstado.text = "Activo"
             tvEstado.setTextColor(resources.getColor(android.R.color.holo_green_dark, null))
@@ -208,41 +229,6 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             tvEstado.text = "Inactivo"
             tvEstado.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
             btnActivar.text = "Activar"
-        }
-    }
-
-    private fun actualizarColorMarcador(dispositivo: DispositivoRiego) {
-        googleMap?.clear()
-        dispositivos.forEach { d ->
-            val color = if (d.activo)
-                BitmapDescriptorFactory.HUE_GREEN
-            else
-                BitmapDescriptorFactory.HUE_RED
-            googleMap?.addMarker(
-                MarkerOptions()
-                    .position(d.ubicacion)
-                    .title(d.nombre)
-                    .icon(BitmapDescriptorFactory.defaultMarker(color))
-            )
-        }
-        googleMap?.setOnMarkerClickListener { marker ->
-            val d = dispositivos.find { it.nombre == marker.title }
-            d?.let { mostrarBottomSheet(it) }
-            true
-        }
-    }
-
-    private fun weatherCodeToText(code: Int?): String {
-        return when (code) {
-            0 -> "Despejado"
-            1, 2, 3 -> "Parcialmente nublado"
-            45, 48 -> "Niebla"
-            51, 53, 55 -> "Llovizna"
-            61, 63, 65 -> "Lluvia"
-            71, 73, 75 -> "Nieve"
-            80, 81, 82 -> "Chubascos"
-            95 -> "Tormenta"
-            else -> "Desconocido"
         }
     }
 

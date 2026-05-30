@@ -11,10 +11,8 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -27,6 +25,7 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.TileOverlay
 import com.google.android.gms.maps.model.TileOverlayOptions
@@ -41,6 +40,8 @@ import com.mssde.pas_project.model.DispositivoRiego
 import com.mssde.pas_project.repository.WeatherRepository
 import com.mssde.pas_project.viewmodel.RiegoViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -60,6 +61,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
     private var rainOverlay: TileOverlay? = null
 
     private var dispositivosFirebase: List<DispositivoRiego> = emptyList()
+    private var primerCarga = true
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -78,6 +80,10 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         riegoViewModel.listaRiegos.observe(viewLifecycleOwner) { lista ->
             dispositivosFirebase = lista
             actualizarMapaYCapas()
+            if (primerCarga && lista.isNotEmpty()) {
+                primerCarga = false
+                ajustarZoomAMarcadores()
+            }
         }
 
         riegoPredictor = RiegoPredictor(requireContext())
@@ -89,7 +95,7 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
                 .build()
             try {
                 findNavController().navigate(R.id.loginFragment, null, navOptions)
-            } catch (e: Exception) {
+            } catch (ignore: Exception) {
                 findNavController().navigate(R.id.loginFragment)
             }
         }
@@ -112,27 +118,47 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         actualizarMapaYCapas()
     }
 
-    private fun mostrarDialogoNuevoDispositivo(latLng: LatLng) {
-        val builder = AlertDialog.Builder(requireContext())
-        builder.setTitle(getString(R.string.app_name))
-        val input = EditText(requireContext())
-        input.setHint(R.string.app_name) 
-        builder.setView(input)
-        builder.setPositiveButton("Añadir") { _, _ ->
-            val nombre = input.text.toString()
-            if (nombre.isNotEmpty()) {
-                val nuevo = DispositivoRiego(nombre, latLng.latitude, latLng.longitude, 50.0, 20.0, 7.0, false)
-                riegoViewModel.actualizarEnFirebase(nuevo)
-            }
+    private fun ajustarZoomAMarcadores() {
+        val map = googleMap ?: return
+        if (dispositivosFirebase.isEmpty()) return
+        val builder = LatLngBounds.Builder()
+        for (d in dispositivosFirebase) {
+            builder.include(LatLng(d.latitud, d.longitud))
         }
-        builder.setNegativeButton("Cancelar", null)
-        builder.show()
+        val bounds = builder.build()
+        map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
     }
 
+    /**
+     * Crea un marcador con un contorno negro que sigue la silueta del icono.
+     */
     private fun getBitmapFromVector(context: Context, vectorResId: Int, color: Int): BitmapDescriptor? {
-        val drawable = ContextCompat.getDrawable(context, vectorResId) ?: return null
+        val drawable = ContextCompat.getDrawable(context, vectorResId)?.mutate() ?: return null
+        val density = context.resources.displayMetrics.density
+        
+        val iconSize = (32 * density).toInt()
+        val outline = (1.2f * density).toInt().coerceAtLeast(1)
+        
+        val totalSize = iconSize + outline * 2
+        val bitmap = Bitmap.createBitmap(totalSize, totalSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        // 1. Dibujar el contorno negro desplazando la silueta en 8 direcciones
+        drawable.setTint(Color.BLACK)
+        val offsets = intArrayOf(-outline, 0, outline)
+        for (dx in offsets) {
+            for (dy in offsets) {
+                if (dx == 0 && dy == 0) continue
+                drawable.setBounds(outline + dx, outline + dy, outline + dx + iconSize, outline + dy + iconSize)
+                drawable.draw(canvas)
+            }
+        }
+
+        // 2. Dibujar la gota en su color original encima
         drawable.setTint(color)
-        val bitmap = drawable.toBitmap()
+        drawable.setBounds(outline, outline, outline + iconSize, outline + iconSize)
+        drawable.draw(canvas)
+
         return BitmapDescriptorFactory.fromBitmap(bitmap)
     }
 
@@ -140,44 +166,42 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         val map = googleMap ?: return
         map.clear()
         val tempPoints = mutableListOf<WeightedLatLng>()
-        val rainPoints = mutableListOf<WeightedLatLng>()
 
         dispositivosFirebase.forEach { dispositivo ->
             val pos = LatLng(dispositivo.latitud, dispositivo.longitud)
-            
-            // COLORACIÓN: Azul Primario para activo, Gris #9E9E9E para inactivo
-            val color = if (dispositivo.activo) {
-                ContextCompat.getColor(requireContext(), R.color.primary_blue)
-            } else {
-                ContextCompat.getColor(requireContext(), R.color.inactive_gray)
-            }
+            val color = if (dispositivo.activo) ContextCompat.getColor(requireContext(), R.color.primary_blue) 
+                        else ContextCompat.getColor(requireContext(), R.color.inactive_gray)
 
             val customIcon = getBitmapFromVector(requireContext(), R.drawable.ic_dispositivo_riego, color)
                 ?: BitmapDescriptorFactory.defaultMarker()
 
-            map.addMarker(MarkerOptions().position(pos).title(dispositivo.nombre).icon(customIcon))
+            map.addMarker(MarkerOptions()
+                .position(pos)
+                .title(dispositivo.nombre)
+                .icon(customIcon))
+
             tempPoints.add(WeightedLatLng(pos, dispositivo.temperatura))
-            cargarDatosLluviaParaHeatmap(dispositivo, rainPoints)
+        }
+
+        lifecycleScope.launch {
+            val jobs = dispositivosFirebase.map { dispositivo ->
+                async(Dispatchers.IO) {
+                    repository.getWeatherByCoords(dispositivo.latitud, dispositivo.longitud).getOrNull()?.let { data ->
+                        val prob = data.daily?.precipitation_probability_max?.getOrNull(0)?.toDouble() ?: 0.0
+                        if (prob > 0) WeightedLatLng(LatLng(dispositivo.latitud, dispositivo.longitud), prob) else null
+                    }
+                }
+            }
+            val rainPoints = jobs.awaitAll().filterNotNull()
+            if (rainPoints.isNotEmpty()) {
+                withContext(Dispatchers.Main) { actualizarCapaLluvia(rainPoints) }
+            }
         }
 
         if (tempPoints.isNotEmpty()) {
             val gradient = Gradient(intArrayOf(Color.YELLOW, Color.RED), floatArrayOf(0.2f, 1.0f))
             val provider = HeatmapTileProvider.Builder().weightedData(tempPoints).radius(50).gradient(gradient).opacity(0.6).build()
             heatOverlay = map.addTileOverlay(TileOverlayOptions().tileProvider(provider))
-        }
-    }
-
-    private fun cargarDatosLluviaParaHeatmap(dispositivo: DispositivoRiego, rainList: MutableList<WeightedLatLng>) {
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { repository.getWeatherByCoords(dispositivo.latitud, dispositivo.longitud) }
-            result.onSuccess { data ->
-                val probLluvia = data.daily?.precipitation_probability_max?.getOrNull(0)?.toDouble() ?: 0.0
-                if (probLluvia > 0) {
-                    val pos = LatLng(dispositivo.latitud, dispositivo.longitud)
-                    rainList.add(WeightedLatLng(pos, probLluvia))
-                    actualizarCapaLluvia(rainList)
-                }
-            }
         }
     }
 
@@ -262,13 +286,30 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
     private fun actualizarEstadoUI(tvEstado: TextView?, btnActivar: Button?, dispositivo: DispositivoRiego) {
         if (dispositivo.activo) {
             tvEstado?.setText(R.string.estado_activo)
-            tvEstado?.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_cyan))
+            tvEstado?.setTextColor(ContextCompat.getColor(requireContext(), R.color.primary_blue))
             btnActivar?.setText(R.string.btn_detener)
         } else {
             tvEstado?.setText(R.string.estado_inactivo)
             tvEstado?.setTextColor(ContextCompat.getColor(requireContext(), R.color.inactive_gray))
             btnActivar?.setText(R.string.btn_iniciar)
         }
+    }
+
+    private fun mostrarDialogoNuevoDispositivo(latLng: LatLng) {
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("Añadir Dispositivo")
+        val input = EditText(requireContext())
+        input.setHint("Nombre del dispositivo") 
+        builder.setView(input)
+        builder.setPositiveButton("Añadir") { _, _ ->
+            val nombre = input.text.toString()
+            if (nombre.isNotEmpty()) {
+                val nuevo = DispositivoRiego(nombre, latLng.latitude, latLng.longitude, 50.0, 20.0, 7.0, false)
+                riegoViewModel.actualizarEnFirebase(nuevo)
+            }
+        }
+        builder.setNegativeButton("Cancelar", null)
+        builder.show()
     }
 
     override fun onDestroyView() {

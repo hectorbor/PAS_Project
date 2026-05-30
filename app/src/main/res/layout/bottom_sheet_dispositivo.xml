@@ -119,7 +119,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Calcular si regar"
-        android:enabled="false"
+        android:enabled="true"
         android:layout_marginBottom="8dp"/>
+
+    <Button
+        android:id="@+id/btnEliminar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Eliminar Dispositivo"
+        android:backgroundTint="@android:color/holo_red_dark"
+        android:textColor="@android:color/white"/>
 
 </LinearLayout>

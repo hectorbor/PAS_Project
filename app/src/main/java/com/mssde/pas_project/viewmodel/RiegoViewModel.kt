@@ -11,4 +11,8 @@ class RiegoViewModel : ViewModel() {
     fun actualizarEnFirebase(dispositivo: DispositivoRiego) {
         repository.updateRiego(dispositivo)
     }
+
+    fun eliminarDeFirebase(nombre: String) {
+        repository.deleteRiego(nombre)
+    }
 }

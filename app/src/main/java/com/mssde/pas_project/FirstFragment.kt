@@ -2,12 +2,14 @@ package com.mssde.pas_project
 
 import android.graphics.Color
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -67,7 +69,6 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         riegoViewModel.listaRiegos.observe(viewLifecycleOwner) { lista ->
             dispositivosFirebase = lista
             actualizarMapaYCapas()
-            inicializarDatosSiEsNecesario(lista)
         }
 
         riegoPredictor = RiegoPredictor(requireContext())
@@ -75,15 +76,41 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
+        
         googleMap?.setOnMarkerClickListener { marker ->
             val dispositivo = dispositivosFirebase.find { it.nombre == marker.title }
             dispositivo?.let { mostrarBottomSheet(it) }
             true
         }
 
+        // FUNCIONALIDAD: Poner pines con pulsación larga
+        googleMap?.setOnMapLongClickListener { latLng ->
+            mostrarDialogoNuevoDispositivo(latLng)
+        }
+
         val centro = LatLng(40.4168, -3.7038)
-        googleMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(centro, 11f))
+        googleMap?.moveCamera(CameraUpdateFactory.newLatLngZoom(centro, 13f))
         actualizarMapaYCapas()
+    }
+
+    private fun mostrarDialogoNuevoDispositivo(latLng: LatLng) {
+        val builder = AlertDialog.Builder(requireContext())
+        builder.setTitle("Añadir nuevo dispositivo")
+        
+        val input = EditText(requireContext())
+        input.hint = "Nombre del dispositivo"
+        builder.setView(input)
+
+        builder.setPositiveButton("Añadir") { _, _ ->
+            val nombre = input.text.toString()
+            if (nombre.isNotEmpty()) {
+                val nuevo = DispositivoRiego(nombre, latLng.latitude, latLng.longitude, 50.0, 20.0, 7.0, false)
+                riegoViewModel.actualizarEnFirebase(nuevo)
+                Toast.makeText(requireContext(), "Dispositivo añadido", Toast.LENGTH_SHORT).show()
+            }
+        }
+        builder.setNegativeButton("Cancelar", null)
+        builder.show()
     }
 
     private fun actualizarMapaYCapas() {
@@ -96,23 +123,18 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         dispositivosFirebase.forEach { dispositivo ->
             val pos = LatLng(dispositivo.latitud, dispositivo.longitud)
             
-            // 1. Añadir Marcador
             val color = if (dispositivo.activo) BitmapDescriptorFactory.HUE_GREEN else BitmapDescriptorFactory.HUE_RED
             map.addMarker(MarkerOptions().position(pos).title(dispositivo.nombre).icon(BitmapDescriptorFactory.defaultMarker(color)))
 
-            // 2. Preparar puntos para Heatmap (Calor basado en temperatura del sensor)
             tempPoints.add(WeightedLatLng(pos, dispositivo.temperatura))
-
-            // 3. Obtener datos de lluvia de la API para la capa de lluvia
             cargarDatosLluviaParaHeatmap(dispositivo, rainPoints)
         }
 
-        // Crear Heatmap de Temperatura (Rojo/Amarillo)
         if (tempPoints.isNotEmpty()) {
             val gradient = Gradient(intArrayOf(Color.YELLOW, Color.RED), floatArrayOf(0.2f, 1.0f))
             val provider = HeatmapTileProvider.Builder()
                 .weightedData(tempPoints)
-                .radius(50) // Aproximadamente 5km visualmente a zoom medio
+                .radius(50)
                 .gradient(gradient)
                 .opacity(0.6)
                 .build()
@@ -152,18 +174,6 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
-    private fun inicializarDatosSiEsNecesario(lista: List<DispositivoRiego>) {
-        if (lista.isEmpty()) {
-            val puntosIniciales = listOf(
-                DispositivoRiego("Sector Norte", 40.4168, -3.7038, 45.0, 22.0, 6.5, false),
-                DispositivoRiego("Sector Sur", 40.4180, -3.7050, 30.0, 24.0, 6.8, false),
-                DispositivoRiego("Invernadero A", 40.4150, -3.7020, 60.0, 20.0, 6.2, true),
-                DispositivoRiego("Zona Huerto", 40.4160, -3.7070, 15.0, 26.0, 7.0, false)
-            )
-            puntosIniciales.forEach { riegoViewModel.actualizarEnFirebase(it) }
-        }
-    }
-
     private fun mostrarBottomSheet(dispositivo: DispositivoRiego) {
         val dialog = BottomSheetDialog(requireContext())
         val view = layoutInflater.inflate(R.layout.bottom_sheet_dispositivo, null)
@@ -184,6 +194,13 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
             dispositivo.activo = !dispositivo.activo
             riegoViewModel.actualizarEnFirebase(dispositivo)
             actualizarEstadoUI(tvEstado, btnActivar, dispositivo)
+        }
+
+        // FUNCIONALIDAD: Quitar pines
+        view.findViewById<Button>(R.id.btnEliminar).setOnClickListener {
+            riegoViewModel.eliminarDeFirebase(dispositivo.nombre)
+            dialog.dismiss()
+            Toast.makeText(requireContext(), "Dispositivo eliminado", Toast.LENGTH_SHORT).show()
         }
 
         view.findViewById<Button>(R.id.btnMeteo).setOnClickListener {
@@ -216,7 +233,9 @@ class FirstFragment : Fragment(), OnMapReadyCallback {
                     val eto = 0.0023f * (tempMedia + 17.8f) * Math.sqrt(Math.abs((tempMax - tempMin).toDouble())).toFloat() * 10f
 
                     val (debeRegar, prob) = riegoPredictor.predecir(
-                        dispositivo.humedad.toFloat(), dispositivo.temperatura.toFloat(), dispositivo.ph.toFloat(),
+                        humedadSuelo = dispositivo.humedad.toFloat(),
+                        tempSuelo = dispositivo.temperatura.toFloat(),
+                        ph = dispositivo.ph.toFloat(),
                         tempMax, tempMin, lluvia, 0f, 60f, 10f, 2f, 1f, eto
                     )
                     val porc = (prob * 100).toInt()

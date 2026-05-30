@@ -4,6 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/bg_white"
     android:padding="24dp">
 
     <TextView
@@ -11,8 +12,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Iniciar sesión"
-        android:textSize="28sp"
+        android:textSize="32sp"
         android:textStyle="bold"
+        android:textColor="@color/primary_blue"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -24,6 +26,9 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:hint="Correo electrónico"
+        android:textColorHint="@color/navy_variant"
+        app:hintTextColor="@color/primary_blue"
+        app:boxStrokeColor="@color/primary_blue"
         app:layout_constraintTop_toBottomOf="@id/tvTitle"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -33,6 +38,7 @@
             android:id="@+id/etEmail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/primary_blue"
             android:inputType="textEmailAddress"/>
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -42,7 +48,11 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:hint="Contraseña"
+        android:textColorHint="@color/navy_variant"
+        app:hintTextColor="@color/primary_blue"
+        app:boxStrokeColor="@color/primary_blue"
         app:passwordToggleEnabled="true"
+        app:passwordToggleTint="@color/primary_blue"
         app:layout_constraintTop_toBottomOf="@id/tilEmail"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
@@ -52,6 +62,7 @@
             android:id="@+id/etPassword"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:textColor="@color/primary_blue"
             android:inputType="textPassword"/>
     </com.google.android.material.textfield.TextInputLayout>
 
@@ -61,6 +72,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Entrar"
+        android:textColor="@color/white"
+        android:backgroundTint="@color/primary_blue"
         android:layout_marginTop="32dp"
         app:layout_constraintTop_toBottomOf="@id/tilPassword"
         app:layout_constraintStart_toStartOf="parent"
@@ -72,6 +85,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:text="Crear cuenta"
+        android:textColor="@color/primary_blue"
+        app:strokeColor="@color/primary_blue"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:layout_marginTop="12dp"
         app:layout_constraintTop_toBottomOf="@id/btnLogin"

@@ -2,4 +2,12 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Palette -->
+    <color name="primary_blue">#058ED9</color>
+    <color name="bg_white">#F7F0F0</color>
+    <color name="accent_cyan">#8AF3FF</color>
+    <color name="dark_blue_surface">#111D4A</color>
+    <color name="navy_variant">#2F3061</color>
+    <color name="inactive_gray">#9E9E9E</color>
 </resources>

@@ -1,5 +1,6 @@
 package com.mssde.pas_project.repository
 
+import android.util.Log
 import com.google.firebase.database.*
 import com.mssde.pas_project.model.DispositivoRiego
 import kotlinx.coroutines.channels.awaitClose
@@ -24,7 +25,10 @@ class RiegoRepository {
                 val list = snapshot.children.mapNotNull { it.getValue(DispositivoRiego::class.java) }
                 trySend(list)
             }
-            override fun onCancelled(error: DatabaseError) { close(error.toException()) }
+            override fun onCancelled(error: DatabaseError) {
+                // CAMBIO CLAVE: No lanzamos excepción al cerrar sesión, solo avisamos al log
+                Log.w("Firebase", "Conexión cerrada o falta de permisos: ${error.message}")
+            }
         }
         database.addValueEventListener(listener)
         awaitClose { database.removeEventListener(listener) }

@@ -1,133 +1,190 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
+    android:background="@color/dark_blue_surface"
     android:padding="24dp">
+
+    <View
+        android:id="@+id/viewIndicator"
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:background="#40F7F0F0"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <TextView
         android:id="@+id/tvNombre"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textSize="20sp"
+        android:layout_marginTop="16dp"
+        android:textColor="@color/accent_cyan"
+        android:textSize="26sp"
         android:textStyle="bold"
-        android:layout_marginBottom="16dp"/>
+        app:layout_constraintTop_toBottomOf="@id/viewIndicator"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-    <LinearLayout
+    <TextView
+        android:id="@+id/tvEstado"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textColor="@color/bg_white"
+        android:textSize="16sp"
+        android:textStyle="italic"
+        app:layout_constraintTop_toBottomOf="@id/tvNombre"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <GridLayout
+        android:id="@+id/gridSensores"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
+        android:columnCount="3"
+        android:layout_marginTop="24dp"
+        app:layout_constraintTop_toBottomOf="@id/tvEstado"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Humedad:"
-            android:textStyle="bold"/>
+            android:orientation="vertical"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:background="@color/navy_variant"
+            android:padding="12dp"
+            android:layout_margin="4dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Humedad"
+                android:textColor="@color/bg_white"
+                android:alpha="0.8"
+                android:textSize="12sp"/>
+            <TextView
+                android:id="@+id/tvHumedad"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/accent_cyan"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
 
-        <TextView
-            android:id="@+id/tvHumedad"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-    </LinearLayout>
+            android:orientation="vertical"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:background="@color/navy_variant"
+            android:padding="12dp"
+            android:layout_margin="4dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Suelo"
+                android:textColor="@color/bg_white"
+                android:alpha="0.8"
+                android:textSize="12sp"/>
+            <TextView
+                android:id="@+id/tvTemperatura"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/accent_cyan"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
 
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="8dp">
-
-        <TextView
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Temperatura suelo:"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:id="@+id/tvTemperatura"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginBottom="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="pH:"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:id="@+id/tvPh"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-    </LinearLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:layout_marginBottom="16dp">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Estado:"
-            android:textStyle="bold"/>
-
-        <TextView
-            android:id="@+id/tvEstado"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"/>
-
-        <Button
-            android:id="@+id/btnActivar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Activar"/>
-    </LinearLayout>
+            android:orientation="vertical"
+            android:layout_columnWeight="1"
+            android:gravity="center"
+            android:background="@color/navy_variant"
+            android:padding="12dp"
+            android:layout_margin="4dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="pH"
+                android:textColor="@color/bg_white"
+                android:alpha="0.8"
+                android:textSize="12sp"/>
+            <TextView
+                android:id="@+id/tvPh"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/accent_cyan"
+                android:textSize="18sp"
+                android:textStyle="bold"/>
+        </LinearLayout>
+    </GridLayout>
 
     <TextView
         android:id="@+id/tvMeteo"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="16dp"
-        android:text="Datos meteorológicos: -"/>
+        android:layout_marginTop="16dp"
+        android:background="@color/navy_variant"
+        android:padding="16dp"
+        android:textColor="@color/bg_white"
+        android:textSize="15sp"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/gridSensores"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
-        android:id="@+id/btnMeteo"
-        android:layout_width="match_parent"
+        android:id="@+id/btnActivar"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Obtener datos meteorológicos"
-        android:layout_marginBottom="8dp"/>
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="8dp"
+        android:backgroundTint="@color/primary_blue"
+        android:textColor="@color/white"
+        android:text="Acción"
+        app:layout_constraintTop_toBottomOf="@id/tvMeteo"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/btnRiego" />
 
     <Button
         android:id="@+id/btnRiego"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Calcular si regar"
-        android:enabled="true"
-        android:layout_marginBottom="8dp"/>
+        android:backgroundTint="@color/accent_cyan"
+        android:textColor="@color/dark_blue_surface"
+        android:text="IA Predictor"
+        android:textStyle="bold"
+        app:layout_constraintTop_toTopOf="@id/btnActivar"
+        app:layout_constraintStart_toEndOf="@id/btnActivar"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <Button
+        android:id="@+id/btnMeteo"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="@color/navy_variant"
+        android:textColor="@color/bg_white"
+        android:text="Consultar Clima"
+        app:layout_constraintTop_toBottomOf="@id/btnActivar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
     <Button
         android:id="@+id/btnEliminar"
-        android:layout_width="match_parent"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="Eliminar Dispositivo"
-        android:backgroundTint="@android:color/holo_red_dark"
-        android:textColor="@android:color/white"/>
+        android:textColor="#FF6B6B"
+        app:layout_constraintTop_toBottomOf="@id/btnMeteo"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>
